@@ -1,5 +1,8 @@
 import Chart from 'chart.js/auto';
 
+const tf = ml5.tf;
+
+
 // Base class for ML models
 class MLModel {
     constructor(config) {
@@ -25,6 +28,96 @@ class MLModel {
         outputs: config.outputSize,
         task: 'classification',
         debug: config.debug || false
+      });
+    }
+
+    async save(nameOrCb = 'model', cb) {
+      return new Promise((resolve) => {
+        // Get the underlying TensorFlow.js model
+        const tfModel = this.model.neuralNetwork.model;
+        
+        // Save the model weights
+        const weightData = tfModel.getWeights().map(tensor => {
+          const data = tensor.dataSync();
+          return Array.from(data);
+        });
+
+        // Create metadata about the model architecture
+        const metadata = {
+          inputs: this.model.options.inputs,
+          outputs: this.model.options.outputs,
+          task: this.model.options.task,
+          architecture: tfModel.getConfig()
+        };
+
+        // Combine everything into a single object
+        const modelData = {
+          metadata: metadata,
+          weights: weightData,
+          inputMin: this.model.inputMin,
+          inputMax: this.model.inputMax,
+          outputMin: this.model.outputMin,
+          outputMax: this.model.outputMax
+        };
+
+        // Create and download the file
+        const blob = new Blob([JSON.stringify(modelData)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${nameOrCb}.model.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        if (cb) cb();
+        resolve();
+      });
+    }
+
+    async load(fileOrPath, cb) {
+      return new Promise((resolve, reject) => {
+        const handleFile = async (file) => {
+          try {
+            const text = await file.text();
+            const modelData = JSON.parse(text);
+            
+            // Recreate the model from the saved architecture
+            const tfModel = tf.sequential(modelData.metadata.architecture);
+            
+            // Load the weights
+            const weights = modelData.weights.map((weightData, index) => {
+              const shape = tfModel.getWeights()[index].shape;
+              const tensor = tf.tensor(weightData, shape);
+              return tensor;
+            });
+            
+            tfModel.setWeights(weights);
+            
+            // Update the ml5 model
+            this.model.model = tfModel;
+            
+            // Restore normalization parameters
+            this.model.inputMin = modelData.inputMin;
+            this.model.inputMax = modelData.inputMax;
+            this.model.outputMin = modelData.outputMin;
+            this.model.outputMax = modelData.outputMax;
+            
+            if (cb) cb();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        if (fileOrPath instanceof File) {
+          handleFile(fileOrPath);
+        } else if (typeof fileOrPath === 'string') {
+          fetch(fileOrPath)
+            .then(response => response.blob())
+            .then(blob => handleFile(new File([blob], 'model.json')))
+            .catch(reject);
+        } else {
+          reject(new Error('Invalid input: expected File or URL string'));
+        }
       });
     }
   
@@ -131,7 +224,11 @@ class MLModel {
           <div class="training-controls">
             <button class="train-button">Train Model</button>
             <button class="test-button" disabled>Test Model</button>
-            <button class="save-button" disabled>Save Model</button>
+            <div class="model-io-controls">
+              <button class="save-button" disabled>Save Model</button>
+              <input type="file" accept=".json,.bin" multiple id="modelUpload" style="display: none">
+              <button class="load-button">Load Model</button>
+            </div>
           </div>
   
           <div class="training-progress" style="display: none">
@@ -143,12 +240,20 @@ class MLModel {
           </div>
         </div>
       `;
-  
+
       // Store element references
       this.dataStatus = this.container.querySelector('.data-status');
       this.trainButton = this.container.querySelector('.train-button');
       this.testButton = this.container.querySelector('.test-button');
       this.saveButton = this.container.querySelector('.save-button');
+      this.loadButton = this.container.querySelector('.load-button');
+      this.modelUpload = this.container.querySelector('#modelUpload');
+
+        // Update file input to accept only .model.json files
+        const modelUpload = this.container.querySelector('.load-button');
+        modelUpload.accept = '.model.json';
+        modelUpload.multiple = false;
+
       this.progressSection = this.container.querySelector('.training-progress');
       this.epochDisplay = this.container.querySelector('.epoch-display');
       this.lossDisplay = this.container.querySelector('.loss-display');
@@ -162,6 +267,53 @@ class MLModel {
       this.trainButton.addEventListener('click', () => this.startTraining());
       this.testButton.addEventListener('click', () => this.testModel());
       this.saveButton.addEventListener('click', () => this.saveModel());
+      this.modelUpload.addEventListener('change', (e) => this.loadModel(e));
+      this.loadButton.addEventListener('click', () => this.modelUpload.click());
+
+      
+    }
+
+    async saveModel() {
+      if (!this.model) {
+        alert('No model to save');
+        return;
+      }
+
+      try {
+        await this.model.save('gesture-model');
+        this.dataStatus.textContent = 'Model saved successfully';
+      } catch (error) {
+        console.error('Error saving model:', error);
+        alert('Failed to save model');
+      }
+    }
+
+
+    async loadModel(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        // Create new model instance with appropriate configuration
+        this.model = new ML5NeuralNetwork({
+          inputSize: 21 * 3, // 21 landmarks with x,y,z coordinates
+          outputSize: Object.keys(this.gestureData || {}).length || 2
+        });
+
+        // Load the model from the single file
+        await this.model.load(file);
+        
+        // Enable testing
+        this.testButton.disabled = false;
+        this.saveButton.disabled = false;
+        this.dataStatus.textContent = 'Model loaded successfully';
+      } catch (error) {
+        console.error('Error loading model:', error);
+        alert('Failed to load model');
+      }
+      
+      // Reset file input
+      event.target.value = '';
     }
   
     async handleDataUpload(event) {
