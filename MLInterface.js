@@ -1,7 +1,4 @@
-import ml5 from 'https://unpkg.com/ml5@latest/dist/ml5.min.js';
-import {Chart} from 'https://unpkg.com/browse/chart.js@4.4.6/dist/chart.js';
-
-
+import Chart from 'chart.js/auto';
 
 // Base class for ML models
 class MLModel {
@@ -27,7 +24,7 @@ class MLModel {
         inputs: config.inputSize,
         outputs: config.outputSize,
         task: 'classification',
-        debug: true
+        debug: config.debug || false
       });
     }
   
@@ -67,20 +64,17 @@ class MLModel {
         data.samples.forEach(sample => {
           // Flatten landmarks array into a single input array
           const input = sample.landmarks.flatMap(l => [l.x, l.y, l.z]);
-          // One-hot encode the output label
-          const output = { [label]: 1 };
+          // Output labels are always just "class" - one classifier output...
+          const output = { class: label };
           formattedData.push({ input, output });
         });
       });
       return formattedData;
     }
   
-    async predict(input) {
-      return new Promise((resolve, reject) => {
-        this.model.classify(input, (error, results) => {
-          if (error) reject(error);
-          else resolve(results);
-        });
+    predict(input) {
+      this.model.classify(input, (results) => {
+          this.classifierOutput = results;
       });
     }
   }
@@ -103,6 +97,7 @@ class MLModel {
       if (!config.containerElement || !(config.containerElement instanceof HTMLElement)) {
         throw new Error('containerElement is required and must be an HTML element');
       }
+
       if (!config.predictor) {
         throw new Error('predictor instance is required');
       }
@@ -185,6 +180,10 @@ class MLModel {
     }
   
     async startTraining() {
+      if (!this.gestureData) {
+        alert('Please load data first');
+        return;
+      }
       const learningRate = parseFloat(this.container.querySelector('.learning-rate').value);
       const epochs = parseInt(this.container.querySelector('.epochs').value);
       const batchSize = parseInt(this.container.querySelector('.batch-size').value);
@@ -216,6 +215,10 @@ class MLModel {
     }
   
     initChart() {
+
+      if (this.chart) {
+        this.chart.destroy();
+      }
       // Initialize Chart.js loss chart
       this.chart = new Chart(this.lossChart.getContext('2d'), {
         type: 'line',
@@ -240,20 +243,58 @@ class MLModel {
     }
   
     updateProgress(epoch, loss) {
+      // ML5.js returns loss as an object with a value property
+      const lossValue = typeof loss === 'object' ? loss.loss : loss;
+      
       this.epochDisplay.textContent = `Epoch: ${epoch}`;
-      this.lossDisplay.textContent = `Loss: ${loss.toFixed(4)}`;
+      this.lossDisplay.textContent = `Loss: ${lossValue.toFixed(4)}`;
       
       // Update chart
-      this.lossData.push(Math.log(loss));
+      this.lossData.push(Math.log(lossValue));
       this.chart.data.labels.push(epoch);
       this.chart.data.datasets[0].data = this.lossData;
       this.chart.update();
-    }
+  }
   
-    async testModel() {
-      // Implementation will connect with the predictor
-      // and test the model on live input
+  async testModel() {
+    if (!this.model) {
+        alert('Please train a model first');
+        return;
     }
+
+    let predictionDisplay = document.getElementById('prediction-display');
+    if (!predictionDisplay) {
+        predictionDisplay = document.createElement('p');
+        predictionDisplay.id = 'prediction-display';
+        predictionDisplay.style.textAlign = 'center';
+        predictionDisplay.style.fontSize = '18px';
+        predictionDisplay.style.margin = '10px 0';
+        this.predictor.config.containerElement.after(predictionDisplay);
+    }
+
+    this.testButton.textContent = this.testButton.textContent === 'Test Model' ? 'Stop Testing' : 'Test Model';
+    
+    if (this.testButton.textContent === 'Test Model') {
+        predictionDisplay.textContent = '';
+        return;
+    }
+
+    // This is an async function - I should, in the loop, check if the button is still 'Stop Testing'
+    // If it is, then I should continue to predict
+    // If it is not, then I should break out of the loop
+    while (this.testButton.textContent === 'Stop Testing') {
+        if (this.predictor.results.landmarks && this.predictor.results.landmarks.length > 0) {
+        const input = this.predictor.results.landmarks[0].flatMap(l => [l.x, l.y, l.z]);
+        this.model.predict(input);
+        if (this.model.classifierOutput) {
+            const topPrediction = this.model.classifierOutput.sort((a, b) => b.value - a.value)[0];
+            predictionDisplay.textContent = `Prediction: ${topPrediction.label} (${(topPrediction.confidence * 100).toFixed(2)}%)`
+          }
+      }
+      // Add a sleep function here to slow down the prediction rate
+      await new Promise(resolve => setTimeout(resolve, 125));
+    }
+  }
   
     async saveModel() {
       if (this.model) {

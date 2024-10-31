@@ -25,6 +25,7 @@ class ClassifierRecorder {
     createInterface() {
         this.container.innerHTML = `
             <div style="margin-bottom: 20px">
+            <h3>Recording Configuration</h3>
                 <label style="display: block; margin-bottom: 10px">
                     Samples per second:
                     <input type="number" class="samples-rate-input" min="1" max="60" value="10">

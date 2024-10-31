@@ -280,6 +280,7 @@ class WebcamPredictor extends EventTarget {
       console.log("Wait! objectDetector not loaded yet.");
       return;
     }
+    this.handLandmarker = handLandmarker;
     
     this.webcamRunning = !this.webcamRunning;
     this.enableWebcamButton.querySelector('.mdc-button__label').textContent = 
