@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <title>Hand Gesture ML Training</title>
+   <style>
+       .ml-training-container {
+           padding: 20px;
+           border: 1px solid #ccc;
+           border-radius: 5px;
+           max-width: 800px;
+       }
+       .parameter {
+           margin: 10px 0;
+           display: flex;
+           align-items: center;
+           gap: 10px;
+       }
+       .parameter input {
+           width: 100px;
+       }
+       .training-controls {
+           margin: 20px 0;
+           display: flex;
+           gap: 10px;
+       }
+       .training-progress {
+           margin-top: 20px;
+       }
+       .loss-chart {
+           margin-top: 10px;
+           width: 100%;
+           height: 200px;
+       }
+   </style>
+</head>
+<body>
+   <div id="gestureTraining"></div>
+   <script type="module" src="./training.js"></script>
+
+</body>
+</html>
