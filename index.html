@@ -34,7 +34,7 @@ limitations under the License. -->
   <div id="data-container"></div>
 
   <script type="module">
-    import { WebcamPredictor } from './MediaPipeWebcam.js';
+    import { WebcamFacePredictor } from './MediaPipeWebcam.js';
     import { KeypointDisplay } from './KeypointDisplay.js';
     import { ClassifierRecorder } from './ClassifierRecorder.js';
     import { MLTrainingInterface } from './MLInterface.js';
@@ -49,7 +49,7 @@ limitations under the License. -->
         const dataContainer = document.getElementById('data-container');
 
         // Create webcam predictor
-        const predictor = new WebcamPredictor({
+        const predictor = new WebcamFacePredictor({
             containerElement: predictionContainer,
         });
 

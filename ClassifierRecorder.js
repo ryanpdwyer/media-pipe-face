@@ -176,7 +176,7 @@ class ClassifierRecorder {
 
     recordSample(results, timestamp) {
         const sample = {
-            landmarks: results.landmarks[0].map(landmark => ({
+            landmarks: results.faceLandmarks[0].map(landmark => ({
                 x: landmark.x,
                 y: landmark.y,
                 z: landmark.z

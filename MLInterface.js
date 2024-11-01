@@ -289,7 +289,7 @@ class MLModel {
   
       // Create and configure model
       this.model = new ML5NeuralNetwork({
-        inputSize: 21 * 3, // 21 landmarks with x,y,z coordinates
+        inputSize: 384, // 384 faceLandmarks with x,y,z coordinates
         outputSize: Object.keys(this.gestureData).length
       });
   
@@ -378,8 +378,8 @@ class MLModel {
     // If it is, then I should continue to predict
     // If it is not, then I should break out of the loop
     while (this.testButton.textContent === 'Stop Testing') {
-        if (this.predictor.results.landmarks && this.predictor.results.landmarks.length > 0) {
-        const input = this.predictor.results.landmarks[0].flatMap(l => [l.x, l.y, l.z]);
+        if (this.predictor.results.faceLandmarks && this.predictor.results.faceLandmarks.length > 0) {
+        const input = this.predictor.results.faceLandmarks[0].flatMap(l => [l.x, l.y, l.z]);
         this.model.predict(input);
         if (this.model.classifierOutput) {
             const topPrediction = this.model.classifierOutput.sort((a, b) => b.value - a.value)[0];
