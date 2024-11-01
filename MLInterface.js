@@ -31,93 +31,21 @@ class MLModel {
       });
     }
 
-    async save(nameOrCb = 'model', cb) {
+    save(nameOrCb = 'model', cb) {
       return new Promise((resolve) => {
-        // Get the underlying TensorFlow.js model
-        const tfModel = this.model.neuralNetwork.model;
-        
-        // Save the model weights
-        const weightData = tfModel.getWeights().map(tensor => {
-          const data = tensor.dataSync();
-          return Array.from(data);
+        this.model.save(nameOrCb, () => {
+          if (cb) cb();
+          resolve();
         });
-
-        // Create metadata about the model architecture
-        const metadata = {
-          inputs: this.model.options.inputs,
-          outputs: this.model.options.outputs,
-          task: this.model.options.task,
-          architecture: tfModel.getConfig()
-        };
-
-        // Combine everything into a single object
-        const modelData = {
-          metadata: metadata,
-          weights: weightData,
-          inputMin: this.model.inputMin,
-          inputMax: this.model.inputMax,
-          outputMin: this.model.outputMin,
-          outputMax: this.model.outputMax
-        };
-
-        // Create and download the file
-        const blob = new Blob([JSON.stringify(modelData)], { type: 'application/json' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${nameOrCb}.model.json`;
-        link.click();
-        URL.revokeObjectURL(link.href);
-
-        if (cb) cb();
-        resolve();
       });
     }
 
-    async load(fileOrPath, cb) {
-      return new Promise((resolve, reject) => {
-        const handleFile = async (file) => {
-          try {
-            const text = await file.text();
-            const modelData = JSON.parse(text);
-            
-            // Recreate the model from the saved architecture
-            const tfModel = tf.sequential(modelData.metadata.architecture);
-            
-            // Load the weights
-            const weights = modelData.weights.map((weightData, index) => {
-              const shape = tfModel.getWeights()[index].shape;
-              const tensor = tf.tensor(weightData, shape);
-              return tensor;
-            });
-            
-            tfModel.setWeights(weights);
-            
-            // Update the ml5 model
-            this.model.model = tfModel;
-            
-            // Restore normalization parameters
-            this.model.inputMin = modelData.inputMin;
-            this.model.inputMax = modelData.inputMax;
-            this.model.outputMin = modelData.outputMin;
-            this.model.outputMax = modelData.outputMax;
-            
-            if (cb) cb();
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        };
-
-        if (fileOrPath instanceof File) {
-          handleFile(fileOrPath);
-        } else if (typeof fileOrPath === 'string') {
-          fetch(fileOrPath)
-            .then(response => response.blob())
-            .then(blob => handleFile(new File([blob], 'model.json')))
-            .catch(reject);
-        } else {
-          reject(new Error('Invalid input: expected File or URL string'));
-        }
+    load(filesOrPath, cb) {
+      return new Promise((resolve) => {
+        this.model.load(filesOrPath, () => {
+          if (cb) cb();
+          resolve();
+        });
       });
     }
   
@@ -200,6 +128,7 @@ class MLModel {
       this.container.innerHTML = `
         <div class="ml-training-container">
           <h3>Model Training</h3>
+          <p>Use the form below to train a model using the provided data (upload json from the previous section). </p>
           <div class="data-section">
             <input type="file" accept=".json" id="dataUpload">
             <span class="data-status">No data loaded</span>
@@ -230,6 +159,7 @@ class MLModel {
               <button class="load-button">Load Model</button>
             </div>
           </div>
+          <p>To load a model, you must select all three files created by the Save Model command (model.json, model.weights.bin, and model_meta.json).</p>
   
           <div class="training-progress" style="display: none">
             <div class="progress-info">
@@ -281,27 +211,39 @@ class MLModel {
 
       try {
         await this.model.save('gesture-model');
-        this.dataStatus.textContent = 'Model saved successfully';
+        this.dataStatus.textContent = 'Model saved (3 files downloaded)';
       } catch (error) {
         console.error('Error saving model:', error);
         alert('Failed to save model');
       }
     }
 
-
     async loadModel(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+      const files = event.target.files;
+      if (!files || files.length < 3) {
+        alert('Please select all three model files (model.json, model.weights.bin, and model_meta.json)');
+        return;
+      }
 
       try {
-        // Create new model instance with appropriate configuration
+        // Find the metadata file
+        const metaFile = Array.from(files).find(f => f.name.includes('_meta'));
+        if (!metaFile) {
+          throw new Error('Metadata file not found');
+        }
+
+        // Read the metadata to get input/output dimensions
+        const metadata = JSON.parse(await metaFile.text());
+        
+        // Create new model instance with inferred configuration
         this.model = new ML5NeuralNetwork({
-          inputSize: 21 * 3, // 21 landmarks with x,y,z coordinates
-          outputSize: Object.keys(this.gestureData || {}).length || 2
+          inputs: metadata.inputs,
+          outputs: metadata.outputs,
+          task: 'classification'
         });
 
-        // Load the model from the single file
-        await this.model.load(file);
+        // Load the model using ml5's built-in functionality
+        await this.model.load(files);
         
         // Enable testing
         this.testButton.disabled = false;
@@ -309,13 +251,14 @@ class MLModel {
         this.dataStatus.textContent = 'Model loaded successfully';
       } catch (error) {
         console.error('Error loading model:', error);
-        alert('Failed to load model');
+        alert('Failed to load model: ' + error.message);
       }
       
       // Reset file input
       event.target.value = '';
     }
-  
+
+
     async handleDataUpload(event) {
       const file = event.target.files[0];
       if (file) {

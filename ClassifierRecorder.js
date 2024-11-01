@@ -26,6 +26,11 @@ class ClassifierRecorder {
         this.container.innerHTML = `
             <div style="margin-bottom: 20px">
             <h3>Recording Configuration</h3>
+            <p>Use the form below to configure the recording settings and add classes.</p>
+            <label style="display: block; margin-bottom: 10px">
+            Model name:
+            <input type="text" class="model-name-input" placeholder="Enter model name">
+            </label>
                 <label style="display: block; margin-bottom: 10px">
                     Samples per second:
                     <input type="number" class="samples-rate-input" min="1" max="60" value="10">
@@ -35,7 +40,7 @@ class ClassifierRecorder {
                     <input type="number" class="duration-input" min="1" max="300" value="5">
                 </label>
             </div>
-            <h3>Gesture Classes</h3>
+            <h3>Classes</h3>
             <div>
                 <input type="text" class="gesture-class-input" placeholder="Enter class name">
                 <button class="add-class-btn">Add New Class</button>
@@ -50,6 +55,7 @@ class ClassifierRecorder {
         this.classList = this.container.querySelector('.gesture-class-list');
         this.rateInput = this.container.querySelector('.samples-rate-input');
         this.durationInput = this.container.querySelector('.duration-input');
+        this.modelNameInput = this.container.querySelector('.model-name-input');
         
         this.container.querySelector('.add-class-btn').addEventListener('click', () => this.addClass());
         this.container.querySelector('.export-btn').addEventListener('click', () => this.exportData());
@@ -199,7 +205,11 @@ class ClassifierRecorder {
         
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'gesture_data.json';
+        if (this.modelNameInput.value) {
+            link.download = `${this.modelNameInput.value}.json`;
+        } else {
+            link.download = 'classifier_data.json';
+        }
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
