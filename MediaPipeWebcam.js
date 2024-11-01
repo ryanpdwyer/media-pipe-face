@@ -319,6 +319,24 @@ class WebcamPredictor extends EventTarget {
       this.stop();
     }
   }
+
+  // The webcam should be responsible for flattening predictions
+  // to a format that can be used by the classifier.
+  // Events that are emitted (or just the currentOutput) should be
+  // in a standardized format - here just a flattened array of numbers
+  // The number of elements in the array should be written clearly as well
+  // Also, any information about the probabilities, which hand, etc, should be included...
+  flatten(results) {
+    const flattened = [];
+    results.landmarks.forEach((landmarks) => {
+      landmarks.forEach((point) => {
+        flattened.push(point.x);
+        flattened.push(point.y);
+        flattened.push(point.z);
+      });
+    });
+    return flattened;
+  }
   
   async predictWebcam() {
     // Set canvas dimensions
@@ -343,7 +361,10 @@ class WebcamPredictor extends EventTarget {
       this.lastVideoTime = this.video.currentTime;
       this.results = handLandmarker.detectForVideo(this.video, startTimeMs);
       
+      this.currentOutput = this.flatten(this.results);
+
       // Emit prediction event
+      // No real need for evenets...
       this.dispatchEvent(new CustomEvent('prediction', { 
         detail: { 
           results: this.results,

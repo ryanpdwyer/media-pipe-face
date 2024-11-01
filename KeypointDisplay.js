@@ -97,7 +97,7 @@ class KeypointDisplay {
         this.statusElement.textContent = '';
         this.display.className = 'keypoint-display';
     
-        if (!results.landmarks || results.landmarks.length === 0) {
+        if (!results.faceLandmarks || results.faceLandmarks.length === 0) {
           this.statusElement.textContent = 'No hands detected';
           return;
         }
@@ -111,21 +111,25 @@ class KeypointDisplay {
       }
     
       displaySimpleFormat(results) {
-        results.landmarks.forEach((hand, handIndex) => {
+        results.faceLandmarks.forEach((hand, handIndex) => {
           const handDiv = document.createElement('div');
           handDiv.className = 'hand-data';
-          handDiv.innerHTML = `<strong>Hand ${handIndex + 1}:</strong>`;
+          handDiv.innerHTML = `<strong>Element ${handIndex + 1}:</strong>
+          <p>Pts = ${hand.length} points</p>
+          <p>Inputs = ${hand.length * 3} inputs</p>
+          `;
     
+          
+
           // Display key landmarks (e.g., fingertips)
           const fingertipIndices = [4, 8, 12, 16, 20]; // Thumb to pinky fingertips
-          const fingerNames = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
           
           fingertipIndices.forEach((index, fingerIndex) => {
             const point = hand[index];
             const div = document.createElement('div');
             div.className = 'keypoint';
             div.innerHTML = `
-              ${fingerNames[fingerIndex]}: 
+              $Pt ${fingerIndex}: 
               <span>
                 <span class="coordinate">x: ${point.x.toFixed(3)}</span>
                 <span class="coordinate">y: ${point.y.toFixed(3)}</span>
@@ -140,7 +144,7 @@ class KeypointDisplay {
       }
     
       displayDetailedFormat(results) {
-        results.landmarks.forEach((hand, handIndex) => {
+        results.faceLandmarks.forEach((hand, handIndex) => {
           const handDiv = document.createElement('div');
           handDiv.className = 'hand-data';
           handDiv.innerHTML = `<strong>Hand ${handIndex + 1} (${hand.length} points):</strong>`;

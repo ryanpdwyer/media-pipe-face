@@ -289,7 +289,7 @@ class MLModel {
   
       // Create and configure model
       this.model = new ML5NeuralNetwork({
-        inputSize: 384, // 384 faceLandmarks with x,y,z coordinates
+        inputSize: 1434, // 384 faceLandmarks with x,y,z coordinates
         outputSize: Object.keys(this.gestureData).length
       });
   
